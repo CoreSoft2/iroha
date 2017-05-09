@@ -112,7 +112,7 @@ RPCConnectionException::RPCConnectionException(int code, const std::string& mess
   : Ordinary(std::string("RPCConnectionException:")
              + "ErrorCode: "
              + std::to_string(code)
-             + "Message: " + message) {}
+             + ", Message: " + message) {}
 
 InvalidTransactionException::InvalidTransactionException()
   : Ordinary("InvalidTransactionException") {}
