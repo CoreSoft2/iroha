@@ -41,7 +41,7 @@ namespace peer{
       );
       std::string message = "getPing!";
       std::string myip = ::peer::myself::getIp();
-      auto vec = flatbuffer_service::endpoint::CreatePing(message,myip);
+      auto vec = tx_builder::endpoint::CreatePing(message,myip);
       auto &ping = *flatbuffers::GetRoot<iroha::Ping>(vec.data());
       connection::memberShipService::SyncImpl::getPeers::send(default_leader_ip,ping);
 
@@ -86,7 +86,7 @@ namespace peer{
         std::string root_hash = repository::getMerkleRoot();
         std::string myip = ::peer::myself::getPublicKey();
 
-        auto vec = flatbuffer_service::endpoint::CreatePing(root_hash,myip);
+        auto vec = tx_builder::endpoint::CreatePing(root_hash,myip);
         auto &ping = *flatbuffers::GetRoot<::iroha::Ping>(vec.data());
         if( connection::memberShipService::SyncImpl::checkHash::send(leader->ip, ping) )
           return true;

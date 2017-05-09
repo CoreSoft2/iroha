@@ -49,7 +49,7 @@ void init() {
 }
 
 void append(const iroha::Transaction &tx) {
-  auto buf = flatbuffer_service::transaction::GetTxPointer(tx);
+  auto buf = flatbuffer_service::GetTxPointer(tx);
   db->append(&buf.value());
 }
 

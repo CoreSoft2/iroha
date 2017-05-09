@@ -41,7 +41,7 @@ TEST(FlatbufferServiceTest, toString) {
       signatories(new std::vector<flatbuffers::Offset<flatbuffers::String>>());
   signatories->emplace_back(fbb.CreateString(publicKey));
 
-  auto account_vec = flatbuffer_service::account::CreateAccount(
+  auto account_vec = tx_builder::account::CreateAccount(
       publicKey, "alias", "prevPubKey", {"sig1", "sig2"}, 1);
 
   auto command = iroha::CreateAccountAddDirect(fbb, &account_vec);
@@ -74,7 +74,7 @@ TEST(FlatbufferServiceTest, toString) {
 TEST(FlatbufferServiceTest, addSignature_AccountAdd) {
   flatbuffers::FlatBufferBuilder fbb;
 
-  const auto accountBuf = flatbuffer_service::account::CreateAccount(
+  const auto accountBuf = tx_builder::account::CreateAccount(
     "PublicKey", "Alias\u30e6", "PrevPubKey", {"sig1", "sig2", "sig3"}, 1);
 
   const auto signatureOffsets = [&] {
@@ -222,7 +222,7 @@ TEST(FlatbufferServiceTest, addSignature_AccountAdd) {
 TEST(FlatbufferServiceTest, makeCommit_AccountAdd) {
   flatbuffers::FlatBufferBuilder fbb;
 
-  const auto accountBuf = flatbuffer_service::account::CreateAccount(
+  const auto accountBuf = tx_builder::account::CreateAccount(
     "PublicKey", "Alias\u30e6", "PrevPubKey", {"sig1", "sig2", "sig3"}, 1);
 
   const auto signatureOffsets = [&] {
@@ -334,7 +334,7 @@ TEST(FlatbufferServiceTest, copyConsensusEvent) {
   flatbuffers::FlatBufferBuilder xbb;
 
   std::vector<std::string> signatories{"123", "-=[p"};
-  const auto account = flatbuffer_service::account::CreateAccount(
+  const auto account = tx_builder::account::CreateAccount(
     "accpubkey", "alias", "PrevPubKey", signatories, 1);
   const auto command = ::iroha::CreateAccountAddDirect(xbb, &account);
   std::vector<flatbuffers::Offset<::iroha::Signature>> tx_signatures;
@@ -427,7 +427,7 @@ TEST(FlatbufferServiceTest, copyConsensusEvent) {
 TEST(FlatbufferServiceTest, toConsensusEvent_Add_withoutAttachment) {
   flatbuffers::FlatBufferBuilder fbb;
 
-  const auto currencyBuf = flatbuffer_service::asset::CreateCurrency(
+  const auto currencyBuf = tx_builder::asset::CreateCurrency(
     "IROHA", "Domain", "Ledger", "Desc", "31415", 4);
 
   const auto signatureOffsets = [&] {
@@ -505,7 +505,7 @@ TEST(FlatbufferServiceTest, toConsensusEvent_Add_withoutAttachment) {
 TEST(FlatbufferServiceTest, toConsensusEvent_Add) {
   flatbuffers::FlatBufferBuilder fbb;
 
-  const auto currencyBuf = flatbuffer_service::asset::CreateCurrency(
+  const auto currencyBuf = tx_builder::asset::CreateCurrency(
     "IROHA", "Domain", "Ledger", "Desc", "31415", 4);
 
   const auto signatureOffsets = [&] {
@@ -608,7 +608,7 @@ void validateOptions(const ::iroha::Transaction* tx) {
 TEST(FlatbufferServiceTest, toConsensusEvent_AccountAdd) {
   flatbuffers::FlatBufferBuilder fbb;
 
-  const auto accountBuf = flatbuffer_service::account::CreateAccount(
+  const auto accountBuf = tx_builder::account::CreateAccount(
       "PublicKey", "Alias\u30e6", "PrevPubKey", {"sig1", "sig2", "sig3"}, 1);
 
   const auto signatureOffsets = [&] {
@@ -743,7 +743,7 @@ TEST(FlatbufferServiceTest, toConsensusEvent_PeerAdd) {
 
   ::peer::Node np("IP", "PUBKEY", "LEDGER", 123.45, true, false);
 
-  const auto peer = flatbuffer_service::primitives::CreatePeer(np);
+  const auto peer = tx_builder::primitives::CreatePeer(np);
 
   const auto signatureOffsets = [&] {
     std::vector<uint8_t> sigblob1 = {'a', 'b'};
@@ -1050,7 +1050,7 @@ TEST(FlatbufferServiceTest, toConsensusEvent_PeerChangeTrust) {
 TEST(FlatbufferServicePeerTest, PeerServiceCreateAdd) {
   auto np = ::peer::Node("ip", "pubKey", 100, "ledger", true, true);
   flatbuffers::FlatBufferBuilder fbb;
-  auto addPeer = flatbuffer_service::peer::CreateAdd(fbb, np);
+  auto addPeer = tx_builder::peer::CreateAdd(fbb, np);
   fbb.Finish(addPeer);
   auto bufptr = fbb.GetBufferPointer();
   auto size = fbb.GetSize();
@@ -1069,7 +1069,7 @@ TEST(FlatbufferServicePeerTest, PeerServiceCreateAdd) {
 
 TEST(FlatbufferServicePeerTest, PeerServiceCreateRemove) {
   flatbuffers::FlatBufferBuilder fbb;
-  auto removePeer = flatbuffer_service::peer::CreateRemove(fbb, "pubKey");
+  auto removePeer = tx_builder::peer::CreateRemove(fbb, "pubKey");
   fbb.Finish(removePeer);
   auto bufptr = fbb.GetBufferPointer();
   std::vector<uint8_t> buf {bufptr, bufptr + fbb.GetSize()};
@@ -1080,7 +1080,7 @@ TEST(FlatbufferServicePeerTest, PeerServiceCreateRemove) {
 
 TEST(FlatbufferServicePeerTest, PeerServiceCreateSetTrust) {
   flatbuffers::FlatBufferBuilder fbb;
-  auto ofs = flatbuffer_service::peer::CreateSetTrust(fbb, "pubKey", 3.14159265);
+  auto ofs = tx_builder::peer::CreateSetTrust(fbb, "pubKey", 3.14159265);
   fbb.Finish(ofs);
   auto bufptr = fbb.GetBufferPointer();
   std::vector<uint8_t> buf {bufptr, bufptr + fbb.GetSize()};
@@ -1092,7 +1092,7 @@ TEST(FlatbufferServicePeerTest, PeerServiceCreateSetTrust) {
 
 TEST(FlatbufferServicePeerTest, PeerServiceCreateChangeTrust) {
   flatbuffers::FlatBufferBuilder fbb;
-  auto ofs = flatbuffer_service::peer::CreateChangeTrust(fbb, "pubKey", 1.41421356);
+  auto ofs = tx_builder::peer::CreateChangeTrust(fbb, "pubKey", 1.41421356);
   fbb.Finish(ofs);
   auto bufptr = fbb.GetBufferPointer();
   std::vector<uint8_t> buf {bufptr, bufptr + fbb.GetSize()};
@@ -1104,7 +1104,7 @@ TEST(FlatbufferServicePeerTest, PeerServiceCreateChangeTrust) {
 
 TEST(FlatbufferServicePeerTest, PeerServiceCreateSetActive) {
   flatbuffers::FlatBufferBuilder fbb;
-  auto setActive = flatbuffer_service::peer::CreateSetActive(fbb, "pubKey", true);
+  auto setActive = tx_builder::peer::CreateSetActive(fbb, "pubKey", true);
   fbb.Finish(setActive);
   auto bufptr = fbb.GetBufferPointer();
   std::vector<uint8_t> buf {bufptr, bufptr + fbb.GetSize()};
@@ -1115,7 +1115,7 @@ TEST(FlatbufferServicePeerTest, PeerServiceCreateSetActive) {
 
 TEST(FlatbufferServiceTest, PrimitivesCreatePeer) {
   auto np = ::peer::Node("ip", "pubKey", 100, "ledger", true, true);
-  auto peer = flatbuffer_service::primitives::CreatePeer(np);
+  auto peer = tx_builder::primitives::CreatePeer(np);
   auto peerRoot = flatbuffers::GetRoot<::iroha::Peer>(peer.data());
   ASSERT_STREQ(peerRoot->ledger_name()->c_str(), "ledger");
   ASSERT_STREQ(peerRoot->publicKey()->c_str(), "pubKey");
@@ -1127,7 +1127,7 @@ TEST(FlatbufferServiceTest, PrimitivesCreatePeer) {
 
 TEST(FlatbufferServiceTest, PrimitivesCreateSignature) {
   flatbuffers::FlatBufferBuilder fbb;
-  auto sigOffset = flatbuffer_service::primitives::CreateSignature(fbb, "HASH", 999);
+  auto sigOffset = tx_builder::primitives::CreateSignature(fbb, "HASH", 999);
   fbb.Finish(sigOffset);
   auto bufptr = fbb.GetBufferPointer();
   std::vector<uint8_t> buf(bufptr, bufptr + fbb.GetSize());
@@ -1138,7 +1138,7 @@ TEST(FlatbufferServiceTest, PrimitivesCreateSignature) {
   auto signature = std::string(sigroot->signature()->begin(), sigroot->signature()->end());
   //ASSERT_EQ(signature, );
   /*
-   auto signature = flatbuffer_service::primitives::CreateSignature("PUBKEY", {'a','b','c','d'}, 99999);
+   auto signature = tx_builder::primitives::CreateSignature("PUBKEY", {'a','b','c','d'}, 99999);
    auto sigoffset = flatbuffers::GetRoot<iroha::Signature>(signature.data());
    ASSERT_STREQ(sigoffset->publicKey()->c_str(), "PUBKEY");
    ASSERT_EQ(sigoffset->signature()->Get(0), 'a');
@@ -1157,13 +1157,13 @@ TEST(FlatbufferServiceTest, TransactionCreateTransaction) {
 
   flatbuffers::FlatBufferBuilder xbb;
   ::peer::Node np("IP", "PUBKEY", "LEDGER", 123.45, true, false);
-  auto peer = flatbuffer_service::primitives::CreatePeer(np);
+  auto peer = tx_builder::primitives::CreatePeer(np);
   auto peerAdd = iroha::CreatePeerAddDirect(xbb, &peer);
 
   std::vector<uint8_t> dummy = {'d','u','m','m','y'};
   auto attachment = ::iroha::CreateAttachmentDirect(xbb, "dummy", &dummy);
 
-  auto txbuf = flatbuffer_service::transaction::CreateTransaction(
+  auto txbuf = tx_builder::transaction::CreateTransaction(
     xbb,
     "Creator",
     iroha::Command::PeerAdd,
@@ -1192,11 +1192,11 @@ TEST(FlatbufferServiceTest, TransactionCreateTransaction_Without_Attachment) {
 
   flatbuffers::FlatBufferBuilder xbb;
   ::peer::Node np("IP", "PUBKEY", "LEDGER", 123.45, true, false);
-  auto peer = flatbuffer_service::primitives::CreatePeer(np);
+  auto peer = tx_builder::primitives::CreatePeer(np);
   auto peerAdd = iroha::CreatePeerAddDirect(xbb, &peer);
 
 
-  auto txbuf = flatbuffer_service::transaction::CreateTransaction(
+  auto txbuf = tx_builder::transaction::CreateTransaction(
       xbb,
       "Creator",
       iroha::Command::PeerAdd,
@@ -1229,7 +1229,7 @@ TEST(FlatbufferServiceTest, TransactionCreateTransaction_Without_Attachment) {
 TEST(FlatbufferServiceTest, EndPoint_Ping_Test) {
   auto message = "message!";
   auto ip = "sender!";
-  auto vec = flatbuffer_service::endpoint::CreatePing(message,ip);
+  auto vec = tx_builder::endpoint::CreatePing(message,ip);
   auto &ping = *flatbuffers::GetRoot<iroha::Ping>(vec.data());
   ASSERT_TRUE(ping.message()->str() == "message!");
   ASSERT_TRUE(ping.sender()->str() == "sender!");

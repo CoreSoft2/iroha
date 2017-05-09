@@ -130,7 +130,7 @@ class connection_with_grpc_flatbuffer_test : public testing::Test {
   std::thread server_thread_torii;
   std::thread server_thread_accountGetAsset;
 
-    static void SetUpTestCase() { connection::initialize_peer(); }
+  static void SetUpTestCase() { connection::initialize_peer(); }
 
   static void TearDownTestCase() { connection::finish(); }
 
@@ -155,7 +155,7 @@ class connection_with_grpc_flatbuffer_test : public testing::Test {
 TEST_F(connection_with_grpc_flatbuffer_test, Transaction_Add_Asset) {
   flatbuffers::FlatBufferBuilder xbb;
 
-  const auto assetBuf = flatbuffer_service::asset::CreateCurrency(
+  const auto assetBuf = tx_builder::asset::CreateCurrency(
       "IROHA", "Domain", "Ledger", "Desc", "31415", 4);
 
   const auto add = ::iroha::CreateAddDirect(xbb, "AccPubKey", &assetBuf);

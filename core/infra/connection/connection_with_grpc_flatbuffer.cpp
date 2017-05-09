@@ -279,7 +279,7 @@ class SumeragiConnectionServiceImpl final : public ::iroha::Sumeragi::Service {
                                           ->tx_nested_root());
     auto responseOffset = ::iroha::CreateResponseDirect(
         fbbResponse, "OK!!", ::iroha::Code::UNDECIDED,
-        flatbuffer_service::primitives::CreateSignature(fbbResponse, tx_str,
+        tx_builder::primitives::CreateSignature(fbbResponse, tx_str,
                                                         datetime::unixtime()));
 
     fbbResponse.Finish(responseOffset);
@@ -325,7 +325,7 @@ class SumeragiConnectionServiceImpl final : public ::iroha::Sumeragi::Service {
 
     auto responseOffset = ::iroha::CreateResponseDirect(
         fbbResponse, "OK!!", ::iroha::Code::UNDECIDED,
-        flatbuffer_service::primitives::CreateSignature(fbbResponse, tx_str,
+        tx_builder::primitives::CreateSignature(fbbResponse, tx_str,
                                                         datetime::unixtime()));
 
     fbbResponse.Finish(responseOffset);

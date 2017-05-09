@@ -12,6 +12,18 @@ target_link_libraries(http_client
     json
 )
 
+ADD_LIBRARY(tx_builder SHARED
+    tx_builder.cpp
+)
+
+target_link_libraries(tx_builder
+    flatbuffers
+    signature
+    base64
+    hash
+    config_manager
+)
+
 ADD_LIBRARY(flatbuffer_service STATIC
     flatbuffer_service.cpp
 )
@@ -19,11 +31,8 @@ ADD_LIBRARY(flatbuffer_service STATIC
 target_link_libraries(flatbuffer_service
     logger
     expected
-    flatbuffers
+    tx_builder
+    membership_service
     grpc
     exception
-    membership_service
-    signature
-    base64
-    hash
 )
