@@ -61,7 +61,6 @@ int main() {
               return;
           }
       }
-      logger::info("main") << "OWARI";
   });
   connection::run();
   logger::info("main") << "check_server.detach()";
