@@ -41,6 +41,8 @@
 #include <vector>
 #include <fstream>
 #include <sstream>
+#include <memory>
+#include <assert.h>
 
 namespace utils {
 
@@ -74,62 +76,79 @@ std::string toSnake(std::string const &s) {
   return ret;
 }
 
-bool hasPrefix(std::string& const target, std::string const& s) {
-  if (target.size() < s.size()) return false;
-  size_t psize = s.size();
+bool hasPrefix(std::string& const target, std::string const& prefix) {
+  if (target.size() < prefix.size()) return false;
+  size_t psize = prefix.size();
   for (size_t i = 0; i < psize; i++) {
-    if (target[i] != s[i]) return false;
+    if (target[i] != prefix[i]) return false;
   }
   return true;
 }
 
-bool hasSuffix(std::string& const target, std::string const& s) {
-  auto newT = target;
-  auto newS = s;
-  reverse(newT.begin(), newT.end());
-  reverse(newS.begin(), newS.end());
-  return hasPrefix(newT, newS);
+bool hasSuffix(std::string& const target, std::string const& prefix) {
+  auto newTarget = target;
+  auto newPrefix = prefix;
+  reverse(newTarget.begin(), newTarget.end());
+  reverse(newPrefix.begin(), newPrefix.end());
+  return hasPrefix(newTarget, newPrefix);
 }
 
 }  // namespace utils
 
-class Field {
+namespace lexer {
+
+std::vector<std::string> tokenize(std::string const& line) {
+  std::vector<std::string> ret;
+  std::stringstream ss(line);
+  std::string token;
+  while (ss >> token) {
+    if (hasPrefix(token, "//")) return ret;
+    ret.push_back(token);
+  }
+  return ret;
+}
+
+std::vector<std::string> lexLine(std::ifstream& ifs) {
+  std::string line;
+  std::getline(ifs, line);
+  assert(!ifs.fail());
+  return lexer::tokenize(line);
+}
+
+}  // namespace lexer
+
+
+class Input {
 public:
-  Field() = default;
-  Field(std::string const& key, std::string const& type,
-  std::vector<std::string> const& attr = {})
-    : key_(key), type_(type), attribute_(attr) {}
 
-  std::string primitiveType() {
-    if (type_ == "string") return "std::string";
-    if (type_ == "int") return "int";
-    if (type_ == "ubyte") return "uint8_t";
-    if (type_ == "ushort") return "uint8_t";
-    return "flatbuffers::Offset<" + type_ + ">";
+  static Input& getInstance() {
+    static Input instance_;
+    return instance_;
   }
 
-  std::string cppType() {
-    if (hasPrefix(type, "[")) {
-      assert(hasSuffix(type, "]"));
-      return "std::vector<" + primitiveType() + ">";
-    }
-    return primitiveType();
+  static void readSchema(std::string const& fbsPath) {
+    ifs_ = std::ifstream(fbsPath);
   }
 
-  std::string argumentize() {
-    return cppType() + " " + constRefIfNeeded() + " " + key_;
+  std::vector<std::string> nextTokens() {
+    return lexer::lexLine(ifs_);
+  }
+
+  bool eof() {
+    return ifs_.eof() || ifs_.fail();
   }
 
 private:
-  std::string key_;
-  std::string type_;
-  std::vector<std::string> attribute_;
+  Input() {}
+  std::ifstream ifs_;
 };
 
 class Output {
 public:
 
-  static Output& getInstance() const {
+  constexpr int IndentSize = 2;
+
+  static Output& getInstance() {
     static Output instance_;
     return instance_;
   }
@@ -143,11 +162,11 @@ public:
   }
 
   void doNest() {
-    indent_ += 2;
+    indent_ += IndentSize;
   }
 
   void doUnNest() {
-    indent_ -= 2;
+    indent_ -= IndentSize;
     assert(indent_ >= 0);
   }
 
@@ -165,10 +184,80 @@ private:
   std::string result_;
 };
 
-class Table {
+class IOStream {
+protected:
+  Input& in = Input::getInstance();
+  Output& out = Output::getInstance();
+};
+
+template <typename> class ObjectFactory;
+
+template <typename T, typename... Args>
+class ObjectFactory {
 public:
-  bool empty() {
+  virtual ~ObjectFactory() {}
+  static T parse(Args&&... args) {
+    return T::parseInternal(std::forward<Args>(args)...);
+  }
+};
+
+using Tokens = std::vector<std::string>;
+using TokensRef = Tokens const&
+
+class Field final : public ObjectFactory<Field(TokensRef)>, public IOStream {
+public:
+  virtual ~Field() {}
+
+  static std::shared_ptr<Field> parseInternal(TokensRef tokens) {
+
+    assert(tokens.size() >= 4);
+    auto const& variable = tokens[0];
+    assert(tokens[1] == ":");
+    auto const& type = tokens[2];
+
+    if (tokens[3] == "(") {
+      auto args = parseArguments();
+    } else {
+      assert(tokens[3] == ";");
+    }
+
+    return std::make_shared<Field>();
+  }
+
+private:
+  Field() {}
+  std::string key_;
+  std::string type_;
+  std::vector<std::string> attribute_;
+};
+
+class FieldSet final : public ObjectFactory<FieldSet()>, public IOStream {
+public:
+  static FieldSet parse() {
+    FieldSet ret;
+    assert(!in.eof());
+    for (;;) {
+      auto tokens = in.nextTokens();
+      if (tokens.empty()) continue;
+      if (tokens[0] == "}") break;
+      ret.fieldSet_.push_back(ObjectFactory<Field>::parse(tokens));
+    }
+    return ret;
+  }
+
+private:
+  FieldSet() {}
+  std::vector<std::shared_ptr<Field>> fieldSet_;
+};
+
+class Table final : public ObjectFactory<Table(TokensRef)> {
+public:
+  bool null() {
     return tableName.empty();
+  }
+
+  explicit operator bool() const {
+    return !null();
   }
 
   /*
@@ -183,68 +272,52 @@ public:
     return {buf, buf + fbb.GetSize()};
    */
 
-  std::string output() {
-    std::string ret;
-    // TODO(motxx): Enclose all functions in one namespace
-    append(ret, "namespace " + toSnake(tableName) + " {");
-    nestIndent();
-    {
-      append(ret, returnType + " Create" + tableName + "(");
-      nestIndent();
-      for (size_t i = 0; i < fields.size(); i++) {
-        append(ret, argumentize(fields[i])
-                    + (i < fields.size() - 1 ? "," : ""));
-      }
-      unnestIndent();
-      append(ret, ") {");
-      nestIndent();
-      {
-        append(ret, "flatbuffers::FlatBufferBuilder fbb;");
-        // TODO(motxx): Nested user-defined object (Offset<T>)
-      }
-      unnestIndent();
-    }
-    unnestIndent();
-    append(ret, "}  // namespace " + toSnake(tableName));
-    return ret;
-  }
-
-  static Table parseImpl(std::vector<std::string> const& tokens) {
+  static Table parseInternal(TokensRef tokens) {
     if (tokens.size() != 3) return Table();
     if (tokens[0] != "table") return Table();
 
     assert(tokens.size() == 3);
     assert(tokens[2] == "{");
 
-    Table ret;
-    ret.tableName_ = tokens[1];
-    // ToDo(motxx): Parse fields.
-    //ret.fields_;
+    out.append(returnType + " Create" + tableName_ + "(");
+    out.doNest();
+    for (size_t i = 0; i < fields.size(); i++) {
+      Output.getInstance().append(argumentize(fields[i])
+                                  + (i < fields.size() - 1 ? "," : ""));
+    }
+    out.doUnNest();
+    out.append(") {");
+    out.doNest();
+    {
+      out.append("flatbuffers::FlatBufferBuilder fbb;");
+      out.append("auto o = iroha::Create" + tableName_ + "Direct(");
+      out.doNest();
+      {
+        auto fieldTokens = lex<Field>();
+        auto field = ObjectFactory<Field>::parse(fieldTokens);
+
+        out.append("fbb, ");
+      }
+      out.doUnNest();
+      // TODO(motxx): Nested user-defined object (Offset<T>)
+    }
+    out.doUnnest();
     return ret;
   }
 
-  static bool parse(std::vector<std::string> const& tokens) {
-    auto res = parseImpl(tokens);
-    if (!res.empty()) {
-      // ToDo(motxx): It's only for debugging. Return output.
-      std::cout << res.output() << std::endl;
-      return true;
-    }
-    return false;
-  }
-
-  const char* returnType() const {
+  std::string returnType() const {
     return "std::vector<uint8_t>";
   }
 
 private:
+  Table() {}
   std::string tableName_;
-  std::vector<Field> fields_;
+  std::shared_ptr<FieldSet> fieldSet_;
 };
 
-class Include {
+class Include : public ObjectFactory<Include>, public IOStream {
 public:
-  static bool parse(std::vector<std::string> const& tokens) {
+  static Include parse(std::vector<std::string> const& tokens, bool recursive) {
     if (tokens.size() != 2) return false;
     if (tokens[0] != "include") return false;
 
@@ -256,47 +329,30 @@ public:
   }
 
 private:
-
+  Include() {}
 };
 
-class Parser {
+class Schema : public ObjectFactory<Schema>, public IOStream {
 public:
 
-  Parser() = default;
+  static Schema parseInternal() {
 
-  Parser(std::string const& fbsPath, bool recursive = false)
-    : recursive(recursive) {
-    ifs.open(fbsPath);
-    if (ifs.fail()) {
-      std::cerr << "Failed to load '" << fbsname << "'\n";
-      exit(1);
-    }
-    parse();
-  }
+    // ToDo(motxx): Move appropriate func
+    out.append("namespace " + toSnake(tableName) + " {");
+    nestIndent();
 
-  std::vector<std::string> tokenize(std::string const& line) {
-    std::vector<std::string> ret;
-    std::stringstream ss(line);
-    std::string token;
-    while (ss >> token) {
-      if (hasPrefix(token, "//")) return ret;
-      ret.push_back(token);
-    }
-    return ret;
-  }
-
-  void parse() {
-    std::string line;
-    while (std::getline(ifs, line)) {
-      if (line.empty()) continue;
-      auto tokens = tokenize(line);
+    while (true) {
+      auto tokens = lexer::lexLine(ifs);
+      if (tokens.empty()) break;
 
       if (Table::parse(tokens)) continue;
-      if (Include::parse(tokens)) continue;
+      if (Include::parse(tokens, recursive)) continue;
 
       std::cout << "Unrecognized tokens: ";
       dump(tokens);
     }
+    unnestIndent();
+    out.append("}  // namespace " + toSnake(tableName));
   }
 
   void dump(std::vector<std::string> const& tokens) {
@@ -307,8 +363,85 @@ public:
   }
 
 private:
-  std::ifstream ifs;
+  Schema() {}
   bool recursive; // read include files
+};
+
+class CodeGenerator {
+public:
+  virtual std::string generate() = 0;
+  virtual ~CodeGenerator() {}
+};
+
+class FieldSetGenerator : public CodeGenerator {
+public:
+  FieldSetGenerator(FieldSet const& fldSet)
+    : fieldSet_(fldSet) {}
+
+  virtual ~FieldGenerator() {}
+
+
+  std::string primitiveType() {
+    if (type_ == "string") return "std::string";
+    if (type_ == "int") return "int";
+    if (type_ == "ubyte") return "uint8_t";
+    if (type_ == "ushort") return "uint8_t";
+    return "flatbuffers::Offset<" + type_ + ">";
+  }
+
+  std::string cppType() {
+    if (hasPrefix(type, "[")) {
+      assert(hasSuffix(type, "]"));
+      return "std::vector<" + primitiveType() + ">";
+    }
+    return primitiveType();
+  }
+
+  std::string constRefIfNeeded() const {
+    if (type_ == "string") return "const&";
+    return "";
+  }
+
+  std::string argumentize() {
+    return cppType() + " " + constRefIfNeeded() + " " + key_;
+  }
+
+  virtual std::string generate() {
+
+  }
+
+private:
+  FieldSet fieldSet_;
+};
+
+class TableGenerator : public CodeGenerator {
+public:
+  TableGenerator(Table const& tbl)
+    : table_(tbl) {}
+
+  virtual ~TableGenerator() {}
+
+  virtual std::string generate() {
+
+  }
+
+private:
+  Table table_;
+};
+
+class SchemaGenerator : public CodeGenerator {
+public:
+  SchemaGenerator(Schema const& sch)
+    : schema_(sch) {}
+
+  virtual ~SchemaGenerator() {}
+
+  virtual std::string generate() {
+
+  }
+
+private:
+  Schema schema_;
 };
 
 int main() {
