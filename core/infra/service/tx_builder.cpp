@@ -133,13 +133,13 @@ namespace command {
         return ::iroha::CreateAccountMigrateDirect(fbb, &account, p->prevPubKey()->c_str()).Union();
       }
       case Command::ChaincodeAdd: {
-        throw exception::NotImplementedException("Command", __FILE__);
+        throw exception::NotImplementedException("Command ChaincodeAdd", __FILE__);
       }
       case Command::ChaincodeRemove: {
-        throw exception::NotImplementedException("Command", __FILE__);
+        throw exception::NotImplementedException("Command ChaincodeRemove", __FILE__);
       }
       case Command::ChaincodeExecute: {
-        throw exception::NotImplementedException("Command", __FILE__);
+        throw exception::NotImplementedException("Command ChaincodeExecute", __FILE__);
       }
       case Command::PermissionRemove: {
         /*
@@ -147,7 +147,7 @@ namespace command {
         ::iroha::CreateP
         return ::iroha::CreatePermissionRemoveDirect(fbb, p->targetAccount()->c_str(), p->permission_type(), );
          */
-        throw exception::NotImplementedException("Command", __FILE__);
+        throw exception::NotImplementedException("Command PermissionRemove", __FILE__);
       }
       case Command::PermissionAdd: {
         /*
@@ -155,7 +155,7 @@ namespace command {
         std::vector<uint8_t> account(p->account()->begin(), p->account()->end());
         return ::iroha::CreateAccountMigrateDirect(fbb, &account, p->prevPubKey()->c_str()).Union();
          */
-        throw exception::NotImplementedException("Command", __FILE__);
+        throw exception::NotImplementedException("Command PermissionAdd", __FILE__);
       }
       default: return flatbuffers::Offset<void>();
     }
@@ -209,11 +209,16 @@ namespace primitives {  // namespace primitives
     return {ptr, ptr + fbb.GetSize()};
   }
 
+  /**
+   * CreateSignature()
+   * @brief Create signature offset.
+   * @details In order to use various hash structure and create signature
+   * with timestamp, we need hashed string and timestamp in arguments.
+   * @return signature offset
+   */
   flatbuffers::Offset<::iroha::Signature> CreateSignature(
       flatbuffers::FlatBufferBuilder &fbb, const std::string &hash,
       uint64_t timestamp) {
-    // In oreder to use variable hash and create signature with timestamp,
-    // we need hashed string and timestamp in arguments.
     const auto signature = signature::sign(
         hash, config::PeerServiceConfig::getInstance().getMyPublicKey(),
         config::PeerServiceConfig::getInstance().getMyPrivateKey());
@@ -227,8 +232,6 @@ namespace primitives {  // namespace primitives
 
 namespace account {
 
-  // Note: This function is used mainly for debug because Sumeragi doesn't create
-  // Account.
   std::vector<uint8_t> CreateAccount(const std::string &publicKey,
                                      const std::string &alias,
                                      const std::string &prevPubKey,
@@ -254,8 +257,6 @@ namespace account {
 
 namespace asset {
 
-  // Note: This function is used mainly for debug because Sumeragi doesn't create
-  // Currency.
   std::vector<uint8_t> CreateCurrency(const std::string &currencyName,
                                       const std::string &domainName,
                                       const std::string &ledgerName,
@@ -277,6 +278,12 @@ namespace asset {
 
 namespace transaction {  // namespace transaction
 
+  /**
+   *  CreateTransaction()
+   *  @brief Create transaction without attachment.
+   *  @note This function calls fbb.Finish() Caller doesn't have to call Finish()
+   *  @return FlatBuffer transaction
+   */
   std::vector<uint8_t> CreateTransaction(
       flatbuffers::FlatBufferBuilder &fbb, const std::string &creatorPubKey,
       iroha::Command cmd_type, const flatbuffers::Offset<void> &command) {
@@ -285,7 +292,11 @@ namespace transaction {  // namespace transaction
 
   /**
    *  CreateTransaction()
-   *  Notice: This function call fbb.Finish()
+   *  @brief Create transaction.
+   *  @details Calculate hash sha256(creatorPubKey + command_type + timestamp + attachment)
+   *  command_type will be replaced command future.
+   *  @note This function calls fbb.Finish()
+   *  @return FlatBuffer transaction
    */
   std::vector<uint8_t> CreateTransaction(
       flatbuffers::FlatBufferBuilder &fbb, const std::string &creatorPubKey,
@@ -304,17 +315,9 @@ namespace transaction {  // namespace transaction
       }
     };
 
-    auto appendVec = [&](const std::vector<uint8_t> &v) {
-      if (v.empty()) return;
-      for (const auto &e : v) {
-        hashable.push_back((char)e);
-      }
-    };
-
     appendStr(creatorPubKey);
     appendStr(::iroha::EnumNameCommand(cmd_type));
     appendStr(std::to_string(timestamp));
-
 
     if (attachment.o != 0) {
       auto atc = flatbuffers::GetTemporaryPointer(fbb, attachment);
